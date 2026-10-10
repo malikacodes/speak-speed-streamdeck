@@ -4,7 +4,7 @@
 
 I've been having such a fun time building things these last few weeks.
 This one came to me while I was studying for my exam, which is exactly
-when all my best unrelated ideas show up.
+when all my best unrelated ideas show up unfortunately.
 
 I use text to speech and speech to text all the time. It's more
 convenient for me, it's more efficient, and it's faster. I've also been
@@ -18,7 +18,11 @@ When my Mac reads to me with Speak Selection (Option + Esc), a small
 controller floats on screen with a speed button on it, like `1.25×`.
 Clicking it goes up one step. It never goes down. Getting from 1.5× back
 to 1.25× means clicking all the way round with the mouse while I'm trying
-to listen to something.
+to listen to something & i'm a girl 101 apps open at once so it's usually some where on my screen (if i can find it).
+
+![The Speak Selection controller, with its speed button on the left](assets/01-reading-speed-on-a-dial/controller.png)
+
+That `1.25×` on the left is the button this whole project is about.
 
 ## Wrong knob number one
 
@@ -30,14 +34,14 @@ hooked it to a Keyboard Maestro shortcut. I even timed the same paragraph
 at different settings to find a real 2×. A quick brown fox was read to me
 about fifteen times.
 
-It worked, technically. It just wasn't the button I use. The slider is
+It worked, technically but it was janky. The slider is
 the voice's base speed, and the controller's `1.25×` is a separate thing
 on top of it. I deleted the script and the shortcut.
 
 ## Wrong knob number two
 
-The controller saves its speed too, as a number called
-`SpeakSelectionSpeakingRateRatio`. So I changed the number.
+So I found out that the controller saves its speed too, as a number called
+`SpeakSelectionSpeakingRateRatio`. So I changed the number. This is where the fun started...
 
 The label on the controller changed. The voice did not. Now it was
 showing a speed it wasn't using, and then it got worse: the real button
@@ -90,6 +94,10 @@ Two actions:
   moment I used it. Now it goes to the next pick up: from 1.75× with
   picks of 1.25× and 2×, it goes to 2×.
 
+![The dial's strip while reading, paused, and with nothing being read](assets/01-reading-speed-on-a-dial/strip.png)
+
+The strip above the dial: reading, paused, and quiet.
+
 The first time I pressed the key I got Stream Deck's yellow "!" and
 thought I'd broken it. Nothing was being read, that's all. The speed
 button only exists while the Mac is reading, so there was nothing to
@@ -97,10 +105,19 @@ press. A warning sign was too dramatic for that, so now the key and the
 strip go gray and show a small crossed-out ear, the same ear as my
 Option + Esc key.
 
-Last thing: pressing the dial, or tapping the strip, starts and stops the
-reading. So the whole thing lives on one dial now. The first version of
-that did nothing at all, because the helper typed Option + Esc and quit
-before macOS had passed the keys along. A tiny pause fixed it.
+![The key while reading, and with nothing being read](assets/01-reading-speed-on-a-dial/key.png)
+
+The key: reading on the left, quiet with its ear on the right.
+
+Last thing: pressing the dial starts and stops the reading, so the whole
+thing lives on one dial now. The first version of that did nothing at
+all, because the helper typed Option + Esc and quit before macOS had
+passed the keys along. A tiny pause fixed it.
+
+Speaking of pauses: tapping the strip pauses the reading and a second
+tap carries on from the same spot. Stop loses my place and pause
+doesn't, so I wanted both. While it's paused, the strip shows a pause
+sign where the speed was. Gotta love this thing! The stream-deck is just so convenient to me!
 
 ## Did it work?
 
@@ -108,7 +125,9 @@ before macOS had passed the keys along. A tiny pause fixed it.
    strip turns white and pink.
 2. Turn right past 2×. It lands on 1×.
 3. Turn left past 1×. It lands on 2×, after a second.
-4. Stop the reading. The strip goes gray and the ear shows up.
+4. Tap the strip. The reading holds and the strip shows a pause sign.
+   Tap again and it carries on.
+5. Press the dial to stop. The strip goes gray and the ear shows up.
 
 ## What I learned
 
