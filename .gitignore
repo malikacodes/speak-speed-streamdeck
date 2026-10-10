@@ -1,0 +1,6 @@
+node_modules/
+*.log
+logs/
+
+# Compiled from helper/speed.swift by "npm run helper".
+com.malikacodes.speak-speed.sdPlugin/bin/speed

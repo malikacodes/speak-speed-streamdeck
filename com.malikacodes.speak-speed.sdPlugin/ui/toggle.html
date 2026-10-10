@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <!-- Elgato's settings components. Each one saves into this key's
+         settings under the name in "setting". -->
+    <script src="sdpi-components.js"></script>
+  </head>
+  <body>
+    <!-- The two speeds a press switches between. The list is the same
+         five the dial steps through (SPEEDS in src/speeds.js). -->
+    <sdpi-item label="Speed 1">
+      <sdpi-select setting="one" default="1">
+        <option value="1">1×</option>
+        <option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option>
+        <option value="1.75">1.75×</option>
+        <option value="2">2×</option>
+      </sdpi-select>
+    </sdpi-item>
+    <sdpi-item label="Speed 2">
+      <sdpi-select setting="two" default="2">
+        <option value="1">1×</option>
+        <option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option>
+        <option value="1.75">1.75×</option>
+        <option value="2">2×</option>
+      </sdpi-select>
+    </sdpi-item>
+  </body>
+</html>

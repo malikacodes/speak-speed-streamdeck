@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "UUID": "com.malikacodes.speak-speed",
+  "Name": "Speak Speed",
+  "Author": "Malika Codes",
+  "Description": "Changes how fast the Mac reads to me, from a dial or a key. It presses the speed button on the Speak Selection controller.",
+  "Version": "0.1.0.0",
+  "SDKVersion": 3,
+  "CodePath": "bin/plugin.js",
+  "Icon": "imgs/plugin",
+  "CategoryIcon": "imgs/speed",
+  "Category": "Speak Speed",
+  "Nodejs": {
+    "Version": "24"
+  },
+  "Software": {
+    "MinimumVersion": "7.1"
+  },
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "13"
+    }
+  ],
+  "Actions": [
+    {
+      "UUID": "com.malikacodes.speak-speed.dial",
+      "Name": "Speed Dial",
+      "Tooltip": "Turn right for faster, left for slower. Goes round from 2× back to 1×. Press or tap to start or stop reading.",
+      "Icon": "imgs/speed",
+      "Controllers": ["Encoder"],
+      "UserTitleEnabled": false,
+      "Encoder": {
+        "layout": "layouts/strip.json",
+        "TriggerDescription": {
+          "Rotate": "Reading speed",
+          "Push": "Read or stop",
+          "Touch": "Read or stop"
+        }
+      },
+      "States": [
+        {
+          "Image": "imgs/key"
+        }
+      ]
+    },
+    {
+      "UUID": "com.malikacodes.speak-speed.toggle",
+      "Name": "Speed Toggle",
+      "Tooltip": "Press to switch between two reading speeds.",
+      "Icon": "imgs/speed",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "PropertyInspectorPath": "ui/toggle.html",
+      "States": [
+        {
+          "Image": "imgs/key"
+        }
+      ]
+    }
+  ]
+}
