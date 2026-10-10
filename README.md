@@ -10,7 +10,7 @@ So now it's on my Stream Deck, two ways.
 
 | Action | What it does |
 |---|---|
-| 🎛 Speed Dial | Turn right for faster, left for slower: 1× → 1.25× → 1.5× → 1.75× → 2×. It goes round at both ends, so right from 2× is 1× and left from 1× is 2×. Press the dial or tap the strip to start or stop the reading (it presses Option + Esc for me). The strip shows the speed. |
+| 🎛 Speed Dial | Turn right for faster, left for slower: 1× → 1.25× → 1.5× → 1.75× → 2×. It goes round at both ends, so right from 2× is 1× and left from 1× is 2×. Press the dial to start or stop the reading (it presses Option + Esc for me). Tap the strip to pause, and tap again to carry on from the same spot. The strip shows the speed. |
 | ⏩ Speed Toggle | A key that switches between two speeds. I pick them in the key's settings: Speed 1 and Speed 2. If the dial left me on a speed in between, a press goes up to the faster one. |
 
 Both show the current speed, in pink while something is being read. When
@@ -95,11 +95,14 @@ Stream Deck's yellow warning triangle.
   controller, the helper will need another look. I tested on macOS 26.6.
 - The deck checks the controller every two seconds, so after I click the
   on-screen button it can take a moment to catch up.
-- The dial's press and the strip's tap both type Option + Esc. If I
-  change the Speak Selection shortcut in System Settings, it has to
-  change in the helper too.
-- Inside a dial stack the press belongs to the stack, so there it's the
-  tap that starts the reading.
+- The dial's press types Option + Esc. If I change the Speak Selection
+  shortcut in System Settings, it has to change in the helper too.
+- While it's paused the strip shows a pause sign where the speed was.
+  The dots still show the speed.
+- Changing the speed while paused can start the reading again. That's
+  the controller's doing: its own speed button does the same.
+- If nothing is being read, a tap starts the reading. Inside a dial
+  stack the press belongs to the stack, so there the tap is the way in.
 
 ## Tests
 
@@ -108,4 +111,5 @@ npm test
 ```
 
 They cover the stepping and wrapping, which speed the key picks, the
-crossed-out ear, and that everything is drawn on pure black.
+crossed-out ear, the pause sign, and that everything is drawn on pure
+black.

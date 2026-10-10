@@ -32,8 +32,10 @@ function quietEar(x, y, size) {
 //   speed    what to show
 //   reading  false when nothing is being read, which dims everything
 //            and adds the crossed-out ear
+//   paused   true while the reading is on hold, which swaps the speed
+//            for a pause sign. The dots still show the speed.
 //   notice   a short message that takes over the strip for a moment
-export function drawStrip({ speed, reading, notice }) {
+export function drawStrip({ speed, reading, paused, notice }) {
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100" font-family="${FONT}">`,
     `<rect width="200" height="100" fill="${BLACK}"/>`,
@@ -42,7 +44,13 @@ export function drawStrip({ speed, reading, notice }) {
   if (notice) {
     parts.push(`<text x="100" y="56" fill="#ffffff" font-size="15" text-anchor="middle">${notice}</text>`);
   } else {
-    parts.push(`<text x="100" y="56" fill="${reading ? "#ffffff" : DIM}" font-size="34" font-weight="600" text-anchor="middle">${label(speed)}</text>`);
+    if (paused) {
+      // Two bars, about as tall as the speed's numbers were.
+      parts.push(`<rect x="86" y="30" width="9" height="28" rx="2.5" fill="#ffffff"/>`);
+      parts.push(`<rect x="105" y="30" width="9" height="28" rx="2.5" fill="#ffffff"/>`);
+    } else {
+      parts.push(`<text x="100" y="56" fill="${reading ? "#ffffff" : DIM}" font-size="34" font-weight="600" text-anchor="middle">${label(speed)}</text>`);
+    }
     if (!reading) parts.push(quietEar(164, 8, 26));
     SPEEDS.forEach((each, i) => {
       const on = each === speed;

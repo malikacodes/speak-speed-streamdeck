@@ -4,9 +4,11 @@
 //   speed            say what the button reads right now
 //   speed set 1.5    press it until it reads 1.5×, then say what it reads
 //   speed speak      press Option + Esc, which starts or stops the reading
+//   speed pause      press the controller's pause button, or its play
+//                    button if it's already paused
 //
 // It answers with one line of JSON:
-//   {"state":"ok","speed":1.25}
+//   {"state":"ok","speed":1.25,"paused":false}
 //   {"state":"hidden","speed":1.25}   the controller isn't on screen, so nothing
 //                                     is being read. The speed is the saved one.
 //   {"state":"untrusted"}    macOS hasn't let Stream Deck control the computer yet
@@ -49,7 +51,7 @@ func speed(of button: AXUIElement) -> Double? {
 // The controller belongs to a background app with no Dock icon, and it
 // doesn't show up in that app's list of windows. So I ask macOS where
 // that app has anything on screen, then ask what's at the middle of it.
-func findSpeedButton() -> AXUIElement? {
+func findController() -> AXUIElement? {
     let owner = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.accessibility.AXVisualSupportAgent").first
     guard let pid = owner?.processIdentifier else { return nil }
     let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
@@ -64,11 +66,27 @@ func findSpeedButton() -> AXUIElement? {
 
         // The middle might land on the panel or on one of its buttons, so
         // check the thing I hit and then the thing holding it.
-        if let button = speedButton(in: found) { return button }
+        if speedButton(in: found) != nil { return found }
         if let parent = attribute(found, "AXParent"), CFGetTypeID(parent) == AXUIElementGetTypeID(),
-           let button = speedButton(in: parent as! AXUIElement) { return button }
+           speedButton(in: parent as! AXUIElement) != nil { return (parent as! AXUIElement) }
     }
     return nil
+}
+
+// The pause button and the play button are the same button. It's named
+// after its picture, "pause.fill" while reading and "play.fill" while
+// paused, and those names don't change with the Mac's language the way
+// the labels "Pause" and "Play" would.
+func pauseButton(in controller: AXUIElement) -> AXUIElement? {
+    children(controller).first {
+        let name = attribute($0, "AXIdentifier") as? String ?? ""
+        return name.hasPrefix("pause") || name.hasPrefix("play")
+    }
+}
+
+func isPaused(_ controller: AXUIElement) -> Bool {
+    guard let button = pauseButton(in: controller) else { return false }
+    return (attribute(button, "AXIdentifier") as? String)?.hasPrefix("play") == true
 }
 
 // What the controller last saved. Reading it is harmless, it's only
@@ -102,7 +120,9 @@ if CommandLine.arguments.count == 2, CommandLine.arguments[1] == "speak" {
     // here would be out of date. The plugin asks again shortly after.
     answer(#"{"state":"hidden","speed":\#(savedSpeed())}"#)
 }
-guard let button = findSpeedButton() else { answer(#"{"state":"hidden","speed":\#(savedSpeed())}"#) }
+guard let controller = findController(), let button = speedButton(in: controller) else {
+    answer(#"{"state":"hidden","speed":\#(savedSpeed())}"#)
+}
 
 let arguments = CommandLine.arguments
 if arguments.count == 3, arguments[1] == "set", let target = Double(arguments[2]) {
@@ -118,5 +138,14 @@ if arguments.count == 3, arguments[1] == "set", let target = Double(arguments[2]
     }
 }
 
+if arguments.count == 2, arguments[1] == "pause", let toggle = pauseButton(in: controller) {
+    let before = isPaused(controller)
+    if AXUIElementPerformAction(toggle, "AXPress" as CFString) == .success {
+        // Wait for the button to swap its picture, so the answer below
+        // is the new state and not the old one.
+        for _ in 0..<50 where isPaused(controller) == before { usleep(10_000) }
+    }
+}
+
 guard let now = speed(of: button) else { answer(#"{"state":"hidden","speed":\#(savedSpeed())}"#) }
-answer(#"{"state":"ok","speed":\#(now)}"#)
+answer(#"{"state":"ok","speed":\#(now),"paused":\#(isPaused(controller))}"#)

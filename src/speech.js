@@ -7,6 +7,7 @@ import { EventEmitter } from "node:events";
 export class Speech extends EventEmitter {
   // The helper's last answer:
   //   state  "ok"        something is being read and the button is there
+  //                      (paused says whether it's holding its place)
   //          "hidden"    nothing is being read, speed is the saved one
   //          "untrusted" macOS hasn't let Stream Deck press buttons yet
   now = { state: "hidden", speed: 1 };
@@ -64,6 +65,19 @@ export class Speech extends EventEmitter {
     if (this.busy) return;
     await this.run(["speak"]);
     setTimeout(() => this.refresh(), 800);
+  }
+
+  // Pauses the reading, or picks it back up from the same spot. The
+  // helper presses the controller's pause button, which turns into a
+  // play button while it's paused.
+  async pause() {
+    if (this.busy) return;
+    await this.run(["pause"]);
+    this.emit("change");
+  }
+
+  get paused() {
+    return this.reading && this.now.paused === true;
   }
 
   // Asks for a speed. Only one helper runs at a time, like a single

@@ -93,3 +93,16 @@ test("the crossed-out ear only shows while nothing is being read", () => {
   assert.doesNotMatch(drawKey({ speed: 1.75, reading: true, one: 1.25, two: 2 }), ear);
   assert.doesNotMatch(drawStrip({ speed: 1.75, reading: true }), ear);
 });
+
+// While paused the strip shows a pause sign where the speed was. The
+// pink dot stays, so I can still see (and change) the speed it'll use.
+test("a paused strip swaps the speed for a pause sign and keeps its dot", () => {
+  const paused = drawStrip({ speed: 1.5, reading: true, paused: true });
+  assert.equal(paused.match(/<rect x="(86|105)" y="30"/g).length, 2);
+  assert.doesNotMatch(paused, />1\.5×</);
+  assert.equal(paused.match(/fill="#f2a7c3"/g).length, 1);
+
+  const reading = drawStrip({ speed: 1.5, reading: true, paused: false });
+  assert.doesNotMatch(reading, /<rect x="86"/);
+  assert.match(reading, />1\.5×</);
+});

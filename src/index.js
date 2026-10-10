@@ -60,10 +60,14 @@ class SpeedDial extends SingletonAction {
     await speech.speak();
   }
 
-  // Tapping the strip does the same. Inside a dial stack the press
-  // belongs to the stack, so this is the way in from there.
+  // Tapping the strip pauses and picks back up from the same spot, where
+  // the press would stop it for good. If nothing is being read yet, a tap
+  // starts it: inside a dial stack the press belongs to the stack, so
+  // the tap is the only way in from there.
   async onTouchTap() {
-    await speech.speak();
+    if (!speech.reading) await speech.refresh();
+    if (speech.reading) await speech.pause();
+    else await speech.speak();
   }
 
   async showNotice(target, text) {
@@ -80,7 +84,7 @@ class SpeedDial extends SingletonAction {
   async render(target) {
     // Every setFeedback is a message to Stream Deck, so a picture only
     // goes out when it's different from the last one.
-    const image = asImage(drawStrip({ speed: speech.shown, reading: speech.reading, notice: this.notices.get(target.id) }));
+    const image = asImage(drawStrip({ speed: speech.shown, reading: speech.reading, paused: speech.paused, notice: this.notices.get(target.id) }));
     if (this.lastImages.get(target.id) === image) return;
     this.lastImages.set(target.id, image);
     await target.setFeedback({ canvas: image });

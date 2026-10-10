@@ -26,7 +26,7 @@
     {
       "UUID": "com.malikacodes.speak-speed.dial",
       "Name": "Speed Dial",
-      "Tooltip": "Turn right for faster, left for slower. Goes round from 2× back to 1×. Press or tap to start or stop reading.",
+      "Tooltip": "Turn right for faster, left for slower. Goes round from 2× back to 1×. Press to start or stop reading, tap to pause.",
       "Icon": "imgs/speed",
       "Controllers": ["Encoder"],
       "UserTitleEnabled": false,
@@ -35,7 +35,7 @@
         "TriggerDescription": {
           "Rotate": "Reading speed",
           "Push": "Read or stop",
-          "Touch": "Read or stop"
+          "Touch": "Pause or resume"
         }
       },
       "States": [
