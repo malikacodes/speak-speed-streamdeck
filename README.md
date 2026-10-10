@@ -6,12 +6,22 @@ on it: `1.25×`. Click it and it goes up a step. Only up. To go from 1.5×
 back to 1.25× I'd have to click all the way round, with the mouse, while
 trying to listen.
 
+![The Speak Selection controller, with its speed button on the left](journal/assets/01-reading-speed-on-a-dial/controller.png)
+
 So now it's on my Stream Deck, two ways.
 
 | Action | What it does |
 |---|---|
 | 🎛 Speed Dial | Turn right for faster, left for slower: 1× → 1.25× → 1.5× → 1.75× → 2×. It goes round at both ends, so right from 2× is 1× and left from 1× is 2×. Press the dial to start or stop the reading (it presses Option + Esc for me). Tap the strip to pause, and tap again to carry on from the same spot. The strip shows the speed. |
 | ⏩ Speed Toggle | A key that switches between two speeds. I pick them in the key's settings: Speed 1 and Speed 2. If the dial left me on a speed in between, a press goes up to the faster one. |
+
+![The dial's strip while reading, paused, and with nothing being read](journal/assets/01-reading-speed-on-a-dial/strip.png)
+
+The strip above the dial: reading, paused, and quiet.
+
+![The key while reading, and with nothing being read](journal/assets/01-reading-speed-on-a-dial/key.png)
+
+The key: reading on the left, quiet on the right.
 
 Both show the current speed, in pink while something is being read. When
 nothing is, they go gray and a small crossed-out ear shows up.
