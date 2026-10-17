@@ -246,3 +246,21 @@ test("a failed change clears busy and the speed it was heading for", async () =>
   runner.calls[1].answer(ok(1));
   await looking;
 });
+
+// Protects the wait for a pause or speak too, and the newest-wins rule
+// while a change is still waiting for its turn.
+test("two changes asked for during a pause wait, and only the newest happens", async () => {
+  const { speech, runner } = makeHeldSpeech();
+  const pausing = speech.pause();
+  const first = speech.set(1.5);
+  const second = speech.set(2);
+  await settle();
+  assert.equal(runner.calls.length, 1);
+  runner.calls[0].answer(ok(1));
+  await settle();
+  assert.deepEqual(runner.calls.map(call => call.args), [["pause"], ["set", "2"]]);
+  runner.calls[1].answer(ok(2));
+  await Promise.all([pausing, first, second]);
+  assert.equal(runner.mostAtOnce, 1);
+  assert.equal(speech.aim, null);
+});
