@@ -16,10 +16,13 @@ export class Speech extends EventEmitter {
   aim = null;
   busy = false;
 
-  constructor(helperPath, logger) {
+  // runner is whatever starts the helper. It's execFile for real, and a
+  // stand-in in the tests, so they never need the actual helper.
+  constructor(helperPath, logger, runner = execFile) {
     super();
     this.helperPath = helperPath;
     this.logger = logger;
+    this.runner = runner;
   }
 
   get reading() {
@@ -36,7 +39,7 @@ export class Speech extends EventEmitter {
   // Runs the helper once and keeps its answer.
   run(args) {
     return new Promise(resolve => {
-      execFile(this.helperPath, args, { timeout: 8000 }, (error, stdout) => {
+      this.runner(this.helperPath, args, { timeout: 8000 }, (error, stdout) => {
         if (error) {
           this.logger.warn(`The speed helper failed: ${error.message}`);
           return resolve();
