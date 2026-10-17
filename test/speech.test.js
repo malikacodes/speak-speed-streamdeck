@@ -49,3 +49,48 @@ test("a helper that fails leaves the last known state alone and says so", async 
   assert.deepEqual(speech.now, { state: "ok", speed: 2 });
   assert.equal(warnings.length, 1);
 });
+
+// Protects the log line from going back to "Command failed", which reads
+// the same for every kind of failure.
+test("the log says the exit code and what the helper wrote to stderr", async () => {
+  const failure = Object.assign(new Error("Command failed: /fake/speed"), { code: 3 });
+  const { speech, warnings } = makeSpeech([{ error: failure, stderr: "no controller window\n" }]);
+  await speech.refresh();
+  assert.match(warnings[0], /exited with code 3/);
+  assert.match(warnings[0], /no controller window/);
+});
+
+// Protects telling a hang apart from a crash. A timeout kills the helper
+// with a signal, so the signal alone would read as a crash.
+test("the log says timed out when the timeout killed the helper", async () => {
+  const failure = Object.assign(new Error("Command failed"), { killed: true, signal: "SIGTERM", code: null });
+  const { speech, warnings } = makeSpeech([{ error: failure }]);
+  await speech.refresh();
+  assert.match(warnings[0], /timed out/);
+});
+
+// Protects the crash case: no exit code, only a signal.
+test("the log names the signal when the helper was stopped by one", async () => {
+  const failure = Object.assign(new Error("Command failed"), { killed: false, signal: "SIGSEGV", code: null });
+  const { speech, warnings } = makeSpeech([{ error: failure }]);
+  await speech.refresh();
+  assert.match(warnings[0], /SIGSEGV/);
+});
+
+// Protects a missing helper binary from reading like a bad exit.
+test("the log says so when the helper can't be started at all", async () => {
+  const failure = Object.assign(new Error("spawn /fake/speed ENOENT"), { code: "ENOENT" });
+  const { speech, warnings } = makeSpeech([{ error: failure }]);
+  await speech.refresh();
+  assert.match(warnings[0], /ENOENT/);
+});
+
+// Protects the empty answer having its own words: a clean exit with
+// nothing printed isn't the same as printing junk.
+test("the log tells an empty answer apart from one that isn't JSON", async () => {
+  const { speech, warnings } = makeSpeech([{ stdout: "" }, { stdout: "oops" }]);
+  await speech.refresh();
+  await speech.refresh();
+  assert.match(warnings[0], /nothing/);
+  assert.match(warnings[1], /isn't JSON/);
+});
