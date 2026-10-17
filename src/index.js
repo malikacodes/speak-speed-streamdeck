@@ -144,14 +144,15 @@ const toggle = new (action({ UUID: "com.malikacodes.speak-speed.toggle" })(Speed
 streamDeck.actions.registerAction(dial);
 streamDeck.actions.registerAction(toggle);
 
-function everything() {
-  return [...[...dial.actions].map(target => [dial, target]), ...[...toggle.actions].map(target => [toggle, target])];
+// Every dial and key on the deck right now, each with the class that draws it.
+function allTargets() {
+  return [dial, toggle].flatMap(owner => [...owner.actions].map(target => [owner, target]));
 }
 
 // Redraw every dial and key whenever the speed changes, whoever changed
 // it: the dial, the key, or me clicking the controller.
 speech.on("change", () => {
-  for (const [owner, target] of everything()) {
+  for (const [owner, target] of allTargets()) {
     owner.render(target).catch(error => streamDeck.logger.warn(`Couldn't redraw: ${error.message}`));
   }
 });
@@ -159,7 +160,7 @@ speech.on("change", () => {
 // A speed change that didn't happen gets a short notice on every dial
 // and key, since the dial has already snapped back by then.
 speech.on("warning", text => {
-  for (const [owner, target] of everything()) {
+  for (const [owner, target] of allTargets()) {
     showNotice(owner, target, text).catch(error => streamDeck.logger.warn(`Couldn't show a notice: ${error.message}`));
   }
 });
@@ -167,7 +168,7 @@ speech.on("warning", text => {
 // No point checking the controller when none of this is on the deck page
 // I'm looking at.
 setInterval(() => {
-  if (everything().length > 0) speech.refresh();
+  if (allTargets().length > 0) speech.refresh();
 }, CHECK_MS);
 
 streamDeck.connect();
