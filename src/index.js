@@ -28,6 +28,19 @@ function problem() {
   return null;
 }
 
+// Shows a short message on a dial or key for a moment. owner is the
+// SpeedDial or SpeedToggle it belongs to.
+async function showNotice(owner, target, text) {
+  owner.notices.set(target.id, text);
+  await owner.render(target);
+  setTimeout(() => {
+    // Only clear it if a newer message hasn't replaced it.
+    if (owner.notices.get(target.id) !== text) return;
+    owner.notices.delete(target.id);
+    owner.render(target).catch(() => {});
+  }, NOTICE_MS);
+}
+
 class SpeedDial extends SingletonAction {
   // Per dial on screen: the message it's showing for a moment (if any)
   // and the last picture sent to it.
@@ -50,7 +63,7 @@ class SpeedDial extends SingletonAction {
     // Look first, in case reading started since the last check.
     if (!speech.reading) await speech.refresh();
     const stuck = problem();
-    if (stuck) return this.showNotice(ev.action, stuck);
+    if (stuck) return showNotice(this, ev.action, stuck);
     await speech.set(turn(speech.shown, ev.payload.ticks));
   }
 
@@ -70,17 +83,6 @@ class SpeedDial extends SingletonAction {
     else await speech.speak();
   }
 
-  async showNotice(target, text) {
-    this.notices.set(target.id, text);
-    await this.render(target);
-    setTimeout(() => {
-      // Only clear it if a newer message hasn't replaced it.
-      if (this.notices.get(target.id) !== text) return;
-      this.notices.delete(target.id);
-      this.render(target).catch(() => {});
-    }, NOTICE_MS);
-  }
-
   async render(target) {
     // Every setFeedback is a message to Stream Deck, so a picture only
     // goes out when it's different from the last one.
@@ -93,6 +95,7 @@ class SpeedDial extends SingletonAction {
 
 class SpeedToggle extends SingletonAction {
   settings = new Map();
+  notices = new Map();
   lastImages = new Map();
 
   async onWillAppear(ev) {
@@ -108,6 +111,7 @@ class SpeedToggle extends SingletonAction {
 
   onWillDisappear(ev) {
     this.settings.delete(ev.action.id);
+    this.notices.delete(ev.action.id);
     this.lastImages.delete(ev.action.id);
   }
 
@@ -128,7 +132,7 @@ class SpeedToggle extends SingletonAction {
   }
 
   async render(target) {
-    const image = asImage(drawKey({ speed: speech.shown, reading: speech.reading, ...pair(this.settings.get(target.id)) }));
+    const image = asImage(drawKey({ speed: speech.shown, reading: speech.reading, notice: this.notices.get(target.id), ...pair(this.settings.get(target.id)) }));
     if (this.lastImages.get(target.id) === image) return;
     this.lastImages.set(target.id, image);
     await target.setImage(image);
@@ -149,6 +153,14 @@ function everything() {
 speech.on("change", () => {
   for (const [owner, target] of everything()) {
     owner.render(target).catch(error => streamDeck.logger.warn(`Couldn't redraw: ${error.message}`));
+  }
+});
+
+// A speed change that didn't happen gets a short notice on every dial
+// and key, since the dial has already snapped back by then.
+speech.on("warning", text => {
+  for (const [owner, target] of everything()) {
+    showNotice(owner, target, text).catch(error => streamDeck.logger.warn(`Couldn't show a notice: ${error.message}`));
   }
 });
 
