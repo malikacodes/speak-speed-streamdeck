@@ -132,3 +132,117 @@ test("untrusted as the first answer keeps the starting speed", async () => {
   await speech.refresh();
   assert.deepEqual(speech.now, { state: "untrusted", speed: 1 });
 });
+
+// A runner that doesn't answer until the test says so, to stand in for a
+// helper that's still busy pressing. It also remembers the most helpers
+// that were ever running at once, which should never be more than one.
+function heldRunner() {
+  const calls = [];
+  let running = 0;
+  const runner = (file, args, options, callback) => {
+    running += 1;
+    runner.mostAtOnce = Math.max(runner.mostAtOnce, running);
+    calls.push({
+      args,
+      answer: (stdout, error = null) => {
+        running -= 1;
+        callback(error, stdout, "");
+      },
+    });
+  };
+  runner.calls = calls;
+  runner.mostAtOnce = 0;
+  return runner;
+}
+
+function makeHeldSpeech() {
+  const warnings = [];
+  const runner = heldRunner();
+  const speech = new Speech("/fake/speed", { warn: message => warnings.push(message) }, runner);
+  speech.now = { state: "ok", speed: 1 };
+  return { speech, warnings, runner };
+}
+
+// Lets the promises that are ready run, so a call that was going to start
+// a helper has done it by the time the test looks.
+const settle = () => new Promise(resolve => setImmediate(resolve));
+const ok = speed => JSON.stringify({ state: "ok", speed });
+
+// Protects the dial: spinning through three speeds quickly asks the
+// helper for the first and the last, and skips the one in between.
+test("while a change is underway, the newest speed is the next one asked for", async () => {
+  const { speech, runner } = makeHeldSpeech();
+  const first = speech.set(1.5);
+  await speech.set(1.75);
+  await speech.set(2);
+  runner.calls[0].answer(ok(1.5));
+  await settle();
+  assert.deepEqual(runner.calls.map(call => call.args), [["set", "1.5"], ["set", "2"]]);
+  runner.calls[1].answer(ok(2));
+  await first;
+  assert.equal(speech.now.speed, 2);
+  assert.equal(speech.aim, null);
+});
+
+// Protects against the 2 second check landing in the middle of a change
+// and putting an older speed back.
+test("a refresh during a change is skipped", async () => {
+  const { speech, runner } = makeHeldSpeech();
+  const change = speech.set(2);
+  await speech.refresh();
+  assert.equal(runner.calls.length, 1);
+  runner.calls[0].answer(ok(2));
+  await change;
+});
+
+// Protects the one-at-a-time rule for the other three jobs, which used
+// to leave the lane open while they ran.
+for (const job of ["refresh", "speak", "pause"]) {
+  test(`while ${job} is running, no other helper starts`, async () => {
+    const { speech, runner } = makeHeldSpeech();
+    const running = speech[job]();
+    await settle();
+    await speech.refresh();
+    await speech.speak();
+    await speech.pause();
+    assert.equal(runner.calls.length, 1);
+    runner.calls[0].answer(ok(1));
+    await running;
+    assert.equal(speech.busy, false);
+  });
+}
+
+// Protects a turn of the dial that arrives while a refresh is running:
+// it has to wait its turn, not run beside it and not get lost.
+test("a change asked for during a refresh waits for it, then happens", async () => {
+  const { speech, runner } = makeHeldSpeech();
+  const looking = speech.refresh();
+  const change = speech.set(2);
+  await settle();
+  assert.equal(runner.calls.length, 1);
+  runner.calls[0].answer(ok(1));
+  await settle();
+  assert.deepEqual(runner.calls[1].args, ["set", "2"]);
+  runner.calls[1].answer(ok(2));
+  await looking;
+  await change;
+  assert.equal(runner.mostAtOnce, 1);
+  assert.equal(speech.now.speed, 2);
+});
+
+// Protects against a failed change leaving the deck stuck: busy would
+// block every later job and aim would keep the dial on the wrong speed.
+test("a failed change clears busy and the speed it was heading for", async () => {
+  const { speech, runner } = makeHeldSpeech();
+  const change = speech.set(2);
+  runner.calls[0].answer("", Object.assign(new Error("Command failed"), { code: 1 }));
+  await change;
+  assert.equal(speech.busy, false);
+  assert.equal(speech.aim, null);
+  assert.equal(speech.shown, 1);
+  const looking = speech.refresh();
+  await settle();
+  assert.equal(runner.calls.length, 2);
+  runner.calls[1].answer(ok(1));
+  await looking;
+});

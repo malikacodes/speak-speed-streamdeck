@@ -38,6 +38,8 @@ export class Speech extends EventEmitter {
   // The speed I've asked for while the helper is still pressing.
   aim = null;
   busy = false;
+  working = null;
+  setting = false;
 
   // runner is whatever starts the helper. It's execFile for real, and a
   // stand-in in the tests, so they never need the actual helper.
@@ -89,10 +91,24 @@ export class Speech extends EventEmitter {
     });
   }
 
+  // Runs one helper job at a time, like a single checkout lane. Whoever
+  // is in the lane shows up in "working", so a change that arrives
+  // meanwhile can wait for it to finish.
+  async inTheLane(job) {
+    this.busy = true;
+    this.working = job();
+    try {
+      await this.working;
+    } finally {
+      this.busy = false;
+      this.working = null;
+    }
+  }
+
   async refresh() {
     // A change in progress will report back on its own.
     if (this.busy) return;
-    await this.run([]);
+    await this.inTheLane(() => this.run([]));
     this.emit("change");
   }
 
@@ -101,7 +117,7 @@ export class Speech extends EventEmitter {
   // controller has had time to appear or go away.
   async speak() {
     if (this.busy) return;
-    await this.run(["speak"]);
+    await this.inTheLane(() => this.run(["speak"]));
     setTimeout(() => this.refresh(), 800);
   }
 
@@ -110,7 +126,7 @@ export class Speech extends EventEmitter {
   // play button while it's paused.
   async pause() {
     if (this.busy) return;
-    await this.run(["pause"]);
+    await this.inTheLane(() => this.run(["pause"]));
     this.emit("change");
   }
 
@@ -118,24 +134,31 @@ export class Speech extends EventEmitter {
     return this.reading && this.now.paused === true;
   }
 
-  // Asks for a speed. Only one helper runs at a time, like a single
-  // checkout lane: if I spin the dial while it's still pressing, the
-  // newest speed waits its turn and the ones in between get skipped.
+  // Asks for a speed. If I spin the dial while the helper is still
+  // pressing, the newest speed waits its turn and the ones in between get
+  // skipped. If it's busy with something else (a check, a pause), the
+  // change waits for that to finish rather than running beside it.
   async set(speed) {
     this.aim = speed;
     this.emit("change");
-    if (this.busy) return;
+    if (this.setting) return;
 
-    this.busy = true;
-    while (this.aim !== null && this.aim !== this.now.speed) {
-      const target = this.aim;
-      await this.run(["set", String(target)]);
-      // Stop if it didn't take (reading ended, or the helper failed), or
-      // this would keep asking forever.
-      if (!this.reading || this.now.speed !== target) break;
+    this.setting = true;
+    try {
+      while (this.working) await this.working;
+      await this.inTheLane(async () => {
+        while (this.aim !== null && this.aim !== this.now.speed) {
+          const target = this.aim;
+          await this.run(["set", String(target)]);
+          // Stop if it didn't take (reading ended, or the helper failed),
+          // or this would keep asking forever.
+          if (!this.reading || this.now.speed !== target) break;
+        }
+      });
+    } finally {
+      this.aim = null;
+      this.setting = false;
     }
-    this.aim = null;
-    this.busy = false;
     this.emit("change");
   }
 }
