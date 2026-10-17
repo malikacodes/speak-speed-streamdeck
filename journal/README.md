@@ -7,3 +7,4 @@ future me doesn't jam the same button twice.
 | # | Date | Entry |
 |---|---|---|
 | 01 | 2026-10-10 | [My reading speed on a dial](01-reading-speed-on-a-dial.md) |
+| 02 | 2026-10-17 | [Finding out why the helper failed](02-why-the-helper-failed.md) |
