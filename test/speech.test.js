@@ -317,3 +317,21 @@ test("no warning when the change works", async () => {
   await speech.set(2);
   assert.deepEqual(heard, []);
 });
+
+// Protects the case `failed` exists for: the helper broke while nothing
+// seemed to be reading, which isn't the same as the reading ending.
+test("a broken helper warns even when nothing was being read", async () => {
+  const { speech } = makeSpeech([bad]);
+  const heard = listenForWarnings(speech);
+  await speech.set(2);
+  assert.deepEqual(heard, ["Couldn't change speed"]);
+});
+
+// Protects the key's own message: when macOS hasn't allowed the presses,
+// the key says "Needs Accessibility", so no second warning on top.
+test("no warning when the presses aren't allowed yet", async () => {
+  const { speech } = makeSpeech([{ stdout: '{"state":"untrusted"}' }]);
+  const heard = listenForWarnings(speech);
+  await speech.set(2);
+  assert.deepEqual(heard, []);
+});
