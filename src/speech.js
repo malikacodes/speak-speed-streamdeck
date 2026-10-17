@@ -41,6 +41,10 @@ export class Speech extends EventEmitter {
   working = null;
   setting = false;
 
+  // True when the helper's last run didn't give a usable answer.
+  failed = false;
+  lastWarning = null;
+
   // runner is whatever starts the helper. It's execFile for real, and a
   // stand-in in the tests, so they never need the actual helper.
   constructor(helperPath, logger, runner = execFile) {
@@ -63,6 +67,7 @@ export class Speech extends EventEmitter {
 
   // Runs the helper once and keeps its answer.
   run(args) {
+    this.failed = true;
     return new Promise(resolve => {
       this.runner(this.helperPath, args, { timeout: HELPER_TIMEOUT_MS }, (error, stdout, stderr) => {
         if (error) {
@@ -86,6 +91,7 @@ export class Speech extends EventEmitter {
         }
         // "untrusted" never carries a speed, so the last known one stays.
         this.now = answer.state === "untrusted" ? { ...answer, speed: this.now.speed } : answer;
+        this.failed = false;
         resolve();
       });
     });
@@ -134,6 +140,22 @@ export class Speech extends EventEmitter {
     return this.reading && this.now.paused === true;
   }
 
+  // Says so when a change didn't happen, so the dial doesn't just snap
+  // back in silence. If the reading simply ended, the strip already shows
+  // that, so it stays quiet. The same warning isn't repeated until a
+  // change works, or turning a stuck dial would flash it every click.
+  warnIfItDidntTake() {
+    if (this.aim === this.now.speed) {
+      this.lastWarning = null;
+      return;
+    }
+    if (!this.reading && !this.failed) return;
+    const text = "Couldn't change speed";
+    if (this.lastWarning === text) return;
+    this.lastWarning = text;
+    this.emit("warning", text);
+  }
+
   // Asks for a speed. If I spin the dial while the helper is still
   // pressing, the newest speed waits its turn and the ones in between get
   // skipped. If it's busy with something else (a check, a pause), the
@@ -155,6 +177,7 @@ export class Speech extends EventEmitter {
           if (!this.reading || this.now.speed !== target) break;
         }
       });
+      this.warnIfItDidntTake();
     } finally {
       this.aim = null;
       this.setting = false;

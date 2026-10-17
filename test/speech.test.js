@@ -264,3 +264,56 @@ test("two changes asked for during a pause wait, and only the newest happens", a
   assert.equal(runner.mostAtOnce, 1);
   assert.equal(speech.aim, null);
 });
+
+// Collects what the deck would be told to show.
+function listenForWarnings(speech) {
+  const heard = [];
+  speech.on("warning", text => heard.push(text));
+  return heard;
+}
+
+const bad = { error: Object.assign(new Error("Command failed"), { code: 1 }) };
+
+// Protects the dial snapping back with no word: a change that didn't
+// happen has to say so.
+test("a change that fails sends one warning", async () => {
+  const { speech } = makeSpeech([bad]);
+  speech.now = { state: "ok", speed: 1 };
+  const heard = listenForWarnings(speech);
+  await speech.set(2);
+  assert.deepEqual(heard, ["Couldn't change speed"]);
+});
+
+// Protects against the same warning flashing again on every turn of the
+// dial while nothing has changed. A change that works resets it.
+test("the same warning isn't sent twice until a change works", async () => {
+  const { speech } = makeSpeech([bad, bad, { stdout: ok(2) }, bad]);
+  speech.now = { state: "ok", speed: 1 };
+  const heard = listenForWarnings(speech);
+  await speech.set(1.5);
+  await speech.set(1.75);
+  assert.equal(heard.length, 1);
+  await speech.set(2);
+  speech.now = { state: "ok", speed: 2 };
+  await speech.set(1);
+  assert.equal(heard.length, 2);
+});
+
+// Protects the quiet case: if the reading just ended, the strip already
+// shows the crossed-out ear, and a warning on top would be noise.
+test("no warning when the reading ended during the change", async () => {
+  const { speech } = makeSpeech([{ stdout: '{"state":"hidden","speed":1}' }]);
+  speech.now = { state: "ok", speed: 1 };
+  const heard = listenForWarnings(speech);
+  await speech.set(2);
+  assert.deepEqual(heard, []);
+});
+
+// Protects the happy path from crying wolf.
+test("no warning when the change works", async () => {
+  const { speech } = makeSpeech([{ stdout: ok(2) }]);
+  speech.now = { state: "ok", speed: 1 };
+  const heard = listenForWarnings(speech);
+  await speech.set(2);
+  assert.deepEqual(heard, []);
+});
