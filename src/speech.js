@@ -19,6 +19,14 @@ function whatWentWrong(error, stderr) {
   return `couldn't start (${error.code ?? error.message})${detail}`;
 }
 
+// JSON.parse is happy with null, 5 or {}, none of which the deck can draw.
+// A good answer has a state I know, and a speed unless it's "untrusted".
+function isAnswer(answer) {
+  if (answer === null || typeof answer !== "object") return false;
+  if (answer.state === "untrusted") return true;
+  return (answer.state === "ok" || answer.state === "hidden") && typeof answer.speed === "number";
+}
+
 export class Speech extends EventEmitter {
   // The helper's last answer:
   //   state  "ok"        something is being read and the button is there
@@ -63,11 +71,19 @@ export class Speech extends EventEmitter {
           this.logger.warn("The speed helper finished but sent nothing");
           return resolve();
         }
+        let answer;
         try {
-          this.now = JSON.parse(stdout);
+          answer = JSON.parse(stdout);
         } catch {
           this.logger.warn(`The speed helper sent something that isn't JSON: ${stdout}`);
+          return resolve();
         }
+        if (!isAnswer(answer)) {
+          this.logger.warn(`The speed helper sent an answer I don't recognise: ${stdout}`);
+          return resolve();
+        }
+        // "untrusted" never carries a speed, so the last known one stays.
+        this.now = answer.state === "untrusted" ? { ...answer, speed: this.now.speed } : answer;
         resolve();
       });
     });

@@ -101,3 +101,26 @@ test("every helper run is given the 8 second time limit", async () => {
   await speech.refresh();
   assert.equal(runner.calls[0].options.timeout, 8000);
 });
+
+// Protects the deck from answers that parse as JSON but aren't a state:
+// null would make every redraw throw.
+for (const [name, stdout] of [["null", "null"], ["an empty object", "{}"], ["a number", "5"], ["an unknown state", '{"state":"sleeping","speed":1}'], ["a speed that isn't a number", '{"state":"ok","speed":"fast"}']]) {
+  test(`an answer that is ${name} is ignored and logged`, async () => {
+    const { speech, warnings } = makeSpeech([{ stdout: '{"state":"ok","speed":2}' }, { stdout }]);
+    await speech.refresh();
+    await speech.refresh();
+    assert.deepEqual(speech.now, { state: "ok", speed: 2 });
+    assert.equal(warnings.length, 1);
+  });
+}
+
+// The helper really does send {"state":"untrusted"} with no speed
+// (helper/speed.swift), so that answer is good. The deck keeps the last
+// speed it knew, or the dial would have nothing to draw.
+test("untrusted with no speed is accepted and keeps the last speed", async () => {
+  const { speech, warnings } = makeSpeech([{ stdout: '{"state":"ok","speed":1.5}' }, { stdout: '{"state":"untrusted"}' }]);
+  await speech.refresh();
+  await speech.refresh();
+  assert.deepEqual(speech.now, { state: "untrusted", speed: 1.5 });
+  assert.deepEqual(warnings, []);
+});
