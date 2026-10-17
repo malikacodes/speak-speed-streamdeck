@@ -7,7 +7,7 @@ import { Speech } from "../src/speech.js";
 function fakeRunner(replies) {
   const calls = [];
   const runner = (file, args, options, callback) => {
-    calls.push(args);
+    calls.push({ args, options });
     const { error = null, stdout = "", stderr = "" } = replies.shift() ?? {};
     callback(error, stdout, stderr);
   };
@@ -82,7 +82,7 @@ test("the log says so when the helper can't be started at all", async () => {
   const failure = Object.assign(new Error("spawn /fake/speed ENOENT"), { code: "ENOENT" });
   const { speech, warnings } = makeSpeech([{ error: failure }]);
   await speech.refresh();
-  assert.match(warnings[0], /ENOENT/);
+  assert.match(warnings[0], /couldn't start \(ENOENT\)/);
 });
 
 // Protects the empty answer having its own words: a clean exit with
@@ -93,4 +93,11 @@ test("the log tells an empty answer apart from one that isn't JSON", async () =>
   await speech.refresh();
   assert.match(warnings[0], /nothing/);
   assert.match(warnings[1], /isn't JSON/);
+});
+
+// Protects the time limit: without it a stuck helper would hang forever.
+test("every helper run is given the 8 second time limit", async () => {
+  const { speech, runner } = makeSpeech([{ stdout: '{"state":"hidden","speed":1}' }]);
+  await speech.refresh();
+  assert.equal(runner.calls[0].options.timeout, 8000);
 });

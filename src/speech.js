@@ -13,10 +13,10 @@ const HELPER_TIMEOUT_MS = 8000;
 function whatWentWrong(error, stderr) {
   const said = String(stderr ?? "").trim();
   const detail = said ? `: ${said}` : "";
-  if (error.killed) return `timed out after ${HELPER_TIMEOUT_MS / 1000} seconds`;
+  if (error.killed) return `timed out after ${HELPER_TIMEOUT_MS / 1000} seconds${detail}`;
   if (error.signal) return `was stopped by ${error.signal}${detail}`;
   if (typeof error.code === "number") return `exited with code ${error.code}${detail}`;
-  return `couldn't start (${error.code ?? error.message})`;
+  return `couldn't start (${error.code ?? error.message})${detail}`;
 }
 
 export class Speech extends EventEmitter {
