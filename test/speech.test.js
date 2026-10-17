@@ -104,7 +104,7 @@ test("every helper run is given the 8 second time limit", async () => {
 
 // Protects the deck from answers that parse as JSON but aren't a state:
 // null would make every redraw throw.
-for (const [name, stdout] of [["null", "null"], ["an empty object", "{}"], ["a number", "5"], ["an unknown state", '{"state":"sleeping","speed":1}'], ["a speed that isn't a number", '{"state":"ok","speed":"fast"}']]) {
+for (const [name, stdout] of [["null", "null"], ["an empty object", "{}"], ["a number", "5"], ["ok with no speed", '{"state":"ok"}'], ["hidden with no speed", '{"state":"hidden"}'], ["an unknown state", '{"state":"sleeping","speed":1}'], ["a speed that isn't a number", '{"state":"ok","speed":"fast"}']]) {
   test(`an answer that is ${name} is ignored and logged`, async () => {
     const { speech, warnings } = makeSpeech([{ stdout: '{"state":"ok","speed":2}' }, { stdout }]);
     await speech.refresh();
@@ -123,4 +123,12 @@ test("untrusted with no speed is accepted and keeps the last speed", async () =>
   await speech.refresh();
   assert.deepEqual(speech.now, { state: "untrusted", speed: 1.5 });
   assert.deepEqual(warnings, []);
+});
+
+// Protects the very first answer being "untrusted": there's no earlier
+// speed, so the starting one of 1 has to carry over.
+test("untrusted as the first answer keeps the starting speed", async () => {
+  const { speech } = makeSpeech([{ stdout: '{"state":"untrusted"}' }]);
+  await speech.refresh();
+  assert.deepEqual(speech.now, { state: "untrusted", speed: 1 });
 });
