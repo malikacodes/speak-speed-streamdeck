@@ -20,10 +20,14 @@ function asImage(svg) {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
+const NEEDS_ACCESSIBILITY = "Needs Accessibility";
+
 // Why a turn or a press can't do anything right now, or null if it can.
-// The speed button only exists while something is being read.
-function problem() {
-  if (speech.now.state === "untrusted") return "Needs Accessibility";
+// The speed button only exists while something is being read, so this
+// looks again first, in case reading started since the last check.
+async function lookThenCheck() {
+  if (!speech.reading) await speech.refresh();
+  if (speech.now.state === "untrusted") return NEEDS_ACCESSIBILITY;
   if (!speech.reading) return "Start reading first";
   return null;
 }
@@ -60,9 +64,7 @@ class SpeedDial extends SingletonAction {
   // Right is faster, left is slower, and it wraps at both ends. A fast
   // spin arrives as several clicks at once and they all count.
   async onDialRotate(ev) {
-    // Look first, in case reading started since the last check.
-    if (!speech.reading) await speech.refresh();
-    const stuck = problem();
+    const stuck = await lookThenCheck();
     if (stuck) return showNotice(this, ev.action, stuck);
     await speech.set(turn(speech.shown, ev.payload.ticks));
   }
@@ -78,9 +80,8 @@ class SpeedDial extends SingletonAction {
   // starts it: inside a dial stack the press belongs to the stack, so
   // the tap is the only way in from there.
   async onTouchTap() {
-    if (!speech.reading) await speech.refresh();
-    if (speech.reading) await speech.pause();
-    else await speech.speak();
+    if (await lookThenCheck()) await speech.speak();
+    else await speech.pause();
   }
 
   async render(target) {
@@ -117,15 +118,15 @@ class SpeedToggle extends SingletonAction {
 
   // Goes to the next of my two speeds (see next in speeds.js).
   async onKeyDown(ev) {
-    if (!speech.reading) await speech.refresh();
+    const stuck = await lookThenCheck();
 
     // The yellow warning triangle is for the one thing that needs fixing:
     // Stream Deck isn't allowed to press buttons yet.
-    if (speech.now.state === "untrusted") return ev.action.showAlert();
+    if (stuck === NEEDS_ACCESSIBILITY) return ev.action.showAlert();
 
     // Nothing is being read, so there's no speed button to press. The
     // crossed-out ear on the key already says so. No need to shout.
-    if (!speech.reading) return;
+    if (stuck) return;
 
     const { one, two } = pair(this.settings.get(ev.action.id));
     await speech.set(next(speech.shown, one, two));
@@ -144,14 +145,15 @@ const toggle = new (action({ UUID: "com.malikacodes.speak-speed.toggle" })(Speed
 streamDeck.actions.registerAction(dial);
 streamDeck.actions.registerAction(toggle);
 
-function everything() {
-  return [...[...dial.actions].map(target => [dial, target]), ...[...toggle.actions].map(target => [toggle, target])];
+// Every dial and key on the deck right now, each with the class that draws it.
+function allTargets() {
+  return [dial, toggle].flatMap(owner => [...owner.actions].map(target => [owner, target]));
 }
 
 // Redraw every dial and key whenever the speed changes, whoever changed
 // it: the dial, the key, or me clicking the controller.
 speech.on("change", () => {
-  for (const [owner, target] of everything()) {
+  for (const [owner, target] of allTargets()) {
     owner.render(target).catch(error => streamDeck.logger.warn(`Couldn't redraw: ${error.message}`));
   }
 });
@@ -159,7 +161,7 @@ speech.on("change", () => {
 // A speed change that didn't happen gets a short notice on every dial
 // and key, since the dial has already snapped back by then.
 speech.on("warning", text => {
-  for (const [owner, target] of everything()) {
+  for (const [owner, target] of allTargets()) {
     showNotice(owner, target, text).catch(error => streamDeck.logger.warn(`Couldn't show a notice: ${error.message}`));
   }
 });
@@ -167,7 +169,7 @@ speech.on("warning", text => {
 // No point checking the controller when none of this is on the deck page
 // I'm looking at.
 setInterval(() => {
-  if (everything().length > 0) speech.refresh();
+  if (allTargets().length > 0) speech.refresh();
 }, CHECK_MS);
 
 streamDeck.connect();

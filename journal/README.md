@@ -11,3 +11,4 @@ future me doesn't jam the same button twice.
 | 03 | 2026-10-17 | [Checking what the helper says](03-checking-the-answer.md) |
 | 04 | 2026-10-17 | [One helper at a time](04-one-helper-at-a-time.md) |
 | 05 | 2026-10-17 | [Saying when a change didn't happen](05-saying-when-it-fails.md) |
+| 06 | 2026-10-17 | [Tidying index.js](06-tidying-index.md) |
