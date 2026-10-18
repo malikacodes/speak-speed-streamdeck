@@ -64,18 +64,28 @@ export function drawStrip({ speed, reading, paused, notice }) {
 
 // The key, 144 by 144 pixels: the speed in the middle, and the key's two
 // picks along the bottom with the one I'm on in pink. When nothing is
-// being read, the crossed-out ear sits at the top.
-export function drawKey({ speed, reading, one, two }) {
+// being read, the crossed-out ear sits at the top. A notice takes over
+// the middle for a moment, split into two lines because 144 pixels is
+// narrow.
+export function drawKey({ speed, reading, one, two, notice }) {
   const pick = (each, x) =>
     `<text x="${x}" y="122" fill="${each === speed && reading ? PINK : DIM}" font-size="20" font-weight="600" text-anchor="middle">${label(each)}</text>`;
 
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144" font-family="${FONT}">`,
     `<rect width="144" height="144" fill="${BLACK}"/>`,
-    `<text x="72" y="76" fill="${reading ? "#ffffff" : DIM}" font-size="38" font-weight="600" text-anchor="middle">${label(speed)}</text>`,
+    notice ? keyNotice(notice) : `<text x="72" y="76" fill="${reading ? "#ffffff" : DIM}" font-size="38" font-weight="600" text-anchor="middle">${label(speed)}</text>`,
     reading ? "" : quietEar(59, 10, 26),
     pick(one, 40),
     pick(two, 104),
     "</svg>",
   ].join("");
+}
+
+function keyNotice(notice) {
+  const [first, ...rest] = notice.split(" ");
+  return [first, rest.join(" ")]
+    .filter(Boolean)
+    .map((line, i) => `<text x="72" y="${64 + i * 24}" fill="#ffffff" font-size="20" text-anchor="middle">${line}</text>`)
+    .join("");
 }

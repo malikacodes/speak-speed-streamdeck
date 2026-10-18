@@ -19,6 +19,14 @@ function whatWentWrong(error, stderr) {
   return `couldn't start (${error.code ?? error.message})${detail}`;
 }
 
+// JSON.parse is happy with null, 5 or {}, none of which the deck can draw.
+// A good answer has a state I know, and a speed unless it's "untrusted".
+function isAnswer(answer) {
+  if (answer === null || typeof answer !== "object") return false;
+  if (answer.state === "untrusted") return true;
+  return (answer.state === "ok" || answer.state === "hidden") && typeof answer.speed === "number";
+}
+
 export class Speech extends EventEmitter {
   // The helper's last answer:
   //   state  "ok"        something is being read and the button is there
@@ -30,6 +38,12 @@ export class Speech extends EventEmitter {
   // The speed I've asked for while the helper is still pressing.
   aim = null;
   busy = false;
+  working = null;
+  setting = false;
+
+  // True when the helper's last run didn't give a usable answer.
+  failed = false;
+  lastWarning = null;
 
   // runner is whatever starts the helper. It's execFile for real, and a
   // stand-in in the tests, so they never need the actual helper.
@@ -53,6 +67,7 @@ export class Speech extends EventEmitter {
 
   // Runs the helper once and keeps its answer.
   run(args) {
+    this.failed = true;
     return new Promise(resolve => {
       this.runner(this.helperPath, args, { timeout: HELPER_TIMEOUT_MS }, (error, stdout, stderr) => {
         if (error) {
@@ -63,20 +78,43 @@ export class Speech extends EventEmitter {
           this.logger.warn("The speed helper finished but sent nothing");
           return resolve();
         }
+        let answer;
         try {
-          this.now = JSON.parse(stdout);
+          answer = JSON.parse(stdout);
         } catch {
           this.logger.warn(`The speed helper sent something that isn't JSON: ${stdout}`);
+          return resolve();
         }
+        if (!isAnswer(answer)) {
+          this.logger.warn(`The speed helper sent an answer I don't recognise: ${stdout}`);
+          return resolve();
+        }
+        // "untrusted" never carries a speed, so the last known one stays.
+        this.now = answer.state === "untrusted" ? { ...answer, speed: this.now.speed } : answer;
+        this.failed = false;
         resolve();
       });
     });
   }
 
+  // Runs one helper job at a time, like a single checkout lane. Whoever
+  // is in the lane shows up in "working", so a change that arrives
+  // meanwhile can wait for it to finish.
+  async inTheLane(job) {
+    this.busy = true;
+    this.working = job();
+    try {
+      await this.working;
+    } finally {
+      this.busy = false;
+      this.working = null;
+    }
+  }
+
   async refresh() {
     // A change in progress will report back on its own.
     if (this.busy) return;
-    await this.run([]);
+    await this.inTheLane(() => this.run([]));
     this.emit("change");
   }
 
@@ -85,7 +123,7 @@ export class Speech extends EventEmitter {
   // controller has had time to appear or go away.
   async speak() {
     if (this.busy) return;
-    await this.run(["speak"]);
+    await this.inTheLane(() => this.run(["speak"]));
     setTimeout(() => this.refresh(), 800);
   }
 
@@ -94,7 +132,7 @@ export class Speech extends EventEmitter {
   // play button while it's paused.
   async pause() {
     if (this.busy) return;
-    await this.run(["pause"]);
+    await this.inTheLane(() => this.run(["pause"]));
     this.emit("change");
   }
 
@@ -102,24 +140,48 @@ export class Speech extends EventEmitter {
     return this.reading && this.now.paused === true;
   }
 
-  // Asks for a speed. Only one helper runs at a time, like a single
-  // checkout lane: if I spin the dial while it's still pressing, the
-  // newest speed waits its turn and the ones in between get skipped.
+  // Says so when a change didn't happen, so the dial doesn't just snap
+  // back in silence. If the reading simply ended, the strip already shows
+  // that, so it stays quiet. The same warning isn't repeated until a
+  // change works, or turning a stuck dial would flash it every click.
+  warnIfItDidntTake() {
+    if (this.aim === this.now.speed) {
+      this.lastWarning = null;
+      return;
+    }
+    if (!this.reading && !this.failed) return;
+    const text = "Couldn't change speed";
+    if (this.lastWarning === text) return;
+    this.lastWarning = text;
+    this.emit("warning", text);
+  }
+
+  // Asks for a speed. If I spin the dial while the helper is still
+  // pressing, the newest speed waits its turn and the ones in between get
+  // skipped. If it's busy with something else (a check, a pause), the
+  // change waits for that to finish rather than running beside it.
   async set(speed) {
     this.aim = speed;
     this.emit("change");
-    if (this.busy) return;
+    if (this.setting) return;
 
-    this.busy = true;
-    while (this.aim !== null && this.aim !== this.now.speed) {
-      const target = this.aim;
-      await this.run(["set", String(target)]);
-      // Stop if it didn't take (reading ended, or the helper failed), or
-      // this would keep asking forever.
-      if (!this.reading || this.now.speed !== target) break;
+    this.setting = true;
+    try {
+      while (this.working) await this.working;
+      await this.inTheLane(async () => {
+        while (this.aim !== null && this.aim !== this.now.speed) {
+          const target = this.aim;
+          await this.run(["set", String(target)]);
+          // Stop if it didn't take (reading ended, or the helper failed),
+          // or this would keep asking forever.
+          if (!this.reading || this.now.speed !== target) break;
+        }
+      });
+      this.warnIfItDidntTake();
+    } finally {
+      this.aim = null;
+      this.setting = false;
     }
-    this.aim = null;
-    this.busy = false;
     this.emit("change");
   }
 }

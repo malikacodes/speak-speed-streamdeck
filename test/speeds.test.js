@@ -106,3 +106,13 @@ test("a paused strip swaps the speed for a pause sign and keeps its dot", () => 
   assert.doesNotMatch(reading, /<rect x="86"/);
   assert.match(reading, />1\.5×</);
 });
+
+// Protects the key's notice: it takes over the middle from the speed, in
+// two lines so it fits, and the key stays pure black.
+test("a notice on the key replaces the speed in the middle", () => {
+  const svg = drawKey({ speed: 1.5, reading: true, one: 1, two: 2, notice: "Couldn't change speed" });
+  assert.match(svg, />Couldn't</);
+  assert.match(svg, />change speed</);
+  assert.doesNotMatch(svg, /font-size="38"/);
+  assert.match(svg, /<rect width="144" height="144" fill="#000000"\/>/);
+});
