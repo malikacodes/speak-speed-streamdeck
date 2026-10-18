@@ -4,6 +4,21 @@
 import { execFile } from "node:child_process";
 import { EventEmitter } from "node:events";
 
+const HELPER_TIMEOUT_MS = 8000;
+
+// execFile's error says "Command failed" for every kind of failure, so
+// this picks the real reason out of it: a timeout kills the helper with a
+// signal (killed is true), a crash has a signal and no exit code, a bad
+// exit has a code, and a missing binary has a code like "ENOENT".
+function whatWentWrong(error, stderr) {
+  const said = String(stderr ?? "").trim();
+  const detail = said ? `: ${said}` : "";
+  if (error.killed) return `timed out after ${HELPER_TIMEOUT_MS / 1000} seconds${detail}`;
+  if (error.signal) return `was stopped by ${error.signal}${detail}`;
+  if (typeof error.code === "number") return `exited with code ${error.code}${detail}`;
+  return `couldn't start (${error.code ?? error.message})${detail}`;
+}
+
 export class Speech extends EventEmitter {
   // The helper's last answer:
   //   state  "ok"        something is being read and the button is there
@@ -16,10 +31,13 @@ export class Speech extends EventEmitter {
   aim = null;
   busy = false;
 
-  constructor(helperPath, logger) {
+  // runner is whatever starts the helper. It's execFile for real, and a
+  // stand-in in the tests, so they never need the actual helper.
+  constructor(helperPath, logger, runner = execFile) {
     super();
     this.helperPath = helperPath;
     this.logger = logger;
+    this.runner = runner;
   }
 
   get reading() {
@@ -36,9 +54,13 @@ export class Speech extends EventEmitter {
   // Runs the helper once and keeps its answer.
   run(args) {
     return new Promise(resolve => {
-      execFile(this.helperPath, args, { timeout: 8000 }, (error, stdout) => {
+      this.runner(this.helperPath, args, { timeout: HELPER_TIMEOUT_MS }, (error, stdout, stderr) => {
         if (error) {
-          this.logger.warn(`The speed helper failed: ${error.message}`);
+          this.logger.warn(`The speed helper ${whatWentWrong(error, stderr)}`);
+          return resolve();
+        }
+        if (stdout.trim() === "") {
+          this.logger.warn("The speed helper finished but sent nothing");
           return resolve();
         }
         try {
